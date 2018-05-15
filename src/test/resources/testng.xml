@@ -1,0 +1,24 @@
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >
+
+<suite name="Suite1" verbose="1" >
+    <test name="KafkaConsumerRunner">
+        <classes>
+            <class name="com.tetration.network_policy.enforcement.KafkaConsumerRunnerMockTest"/>
+        </classes>
+    </test>
+    <test name="PolicyEnforcementClient">
+        <classes>
+            <class name="com.tetration.network_policy.enforcement.PolicyEnforcementClientMockTest"/>
+        </classes>
+    </test>
+    <test name="PolicyEnforcementClientImpl">
+        <classes>
+            <class name="com.tetration.network_policy.enforcement.PolicyEnforcementClientImplTest"/>
+        </classes>
+    </test>
+    <test name="ProtoHelper">
+        <classes>
+            <class name="com.tetration.network_policy.enforcement.ProtoHelperTest"/>
+        </classes>
+    </test>
+</suite>
