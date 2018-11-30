@@ -72,9 +72,10 @@ public class KafkaConsumerRunnerMockTest {
     public Condition condition;
 
     @Override
-    public void notify(TetrationNetworkPolicyProto.NetworkPolicy networkPolicy) {
+    public void notify(TetrationNetworkPolicyProto.TenantNetworkPolicy tenantNetworkPolicy) {
       lock.lock();
-      eventList.add(networkPolicy);
+      // we've got always one network policy only
+      eventList.add(tenantNetworkPolicy.getNetworkPolicy(0));
       this.condition.signalAll();
       lock.unlock();
     }
@@ -152,7 +153,7 @@ public class KafkaConsumerRunnerMockTest {
       ++intentId;
     }
     for (int k = 0; k < random.nextInt(7); ++k) {
-      TetrationNetworkPolicyProto.InventoryFilter.Builder inventoryBuilder = TetrationNetworkPolicyProto.InventoryFilter.newBuilder();
+      TetrationNetworkPolicyProto.InventoryGroup.Builder inventoryBuilder = TetrationNetworkPolicyProto.InventoryGroup.newBuilder();
       inventoryBuilder.setId(Integer.toString(inventoryFilterId));
       networkPolicyBuilder.addInventoryFilters(inventoryBuilder);
       ++inventoryFilterId;
@@ -267,8 +268,8 @@ public class KafkaConsumerRunnerMockTest {
     }
     assertEquals(expectedNetworkPolicy.getInventoryFiltersCount(), receivedNetworkPolicy.getInventoryFiltersCount());
     for (int i = 0; i < expectedNetworkPolicy.getInventoryFiltersCount(); ++i) {
-      TetrationNetworkPolicyProto.InventoryFilter expectedInventoryFilter = expectedNetworkPolicy.getInventoryFilters(i);
-      TetrationNetworkPolicyProto.InventoryFilter receivedInventoryFilter = receivedNetworkPolicy.getInventoryFilters(i);
+      TetrationNetworkPolicyProto.InventoryGroup expectedInventoryFilter = expectedNetworkPolicy.getInventoryFilters(i);
+      TetrationNetworkPolicyProto.InventoryGroup receivedInventoryFilter = receivedNetworkPolicy.getInventoryFilters(i);
       assertEquals(expectedInventoryFilter.getId(), receivedInventoryFilter.getId());
     }
   }
@@ -280,8 +281,8 @@ public class KafkaConsumerRunnerMockTest {
   @DataProvider(name="receiveSnapshotParameters")
   private Object[][] generateReceiveSnapshotParameters() {
     List<Object[]> result = new ArrayList<>();
-    final int numberOfSnapshots[] = new int[] {1, 2, 10, 20, 100};
-    final int numberOfMessages[] = new int[] {2, 3, 5, 10, 20};
+    final int numberOfSnapshots[] = new int[] {1, 10, 100};
+    final int numberOfMessages[] = new int[] {2, 5, 10}; // -1 means random number
     for (int i = 0; i < numberOfSnapshots.length; ++i) {
       for (int j = 0; j < numberOfMessages.length; ++j) {
         for (POLL_MODE pollMode: POLL_MODE.values()) {
@@ -291,15 +292,15 @@ public class KafkaConsumerRunnerMockTest {
               pollMode,
               Boolean.FALSE
           });
-          result.add(new Object[]{
-              Integer.valueOf(numberOfSnapshots[i]),
-              Integer.valueOf(numberOfMessages[j]),
-              pollMode,
-              Boolean.TRUE
-          });
         } // eof pollMode
       } // eof j
     } // eof i
+    result.add(new Object[]{
+        Integer.valueOf(1),
+        Integer.valueOf(2),
+        POLL_MODE.ONE_SNAPSHOT_PER_POLL,
+        Boolean.TRUE //injectIncompleteSnapshot
+    });
     return result.toArray(new Object[result.size()][]);
   }
 
@@ -350,7 +351,7 @@ public class KafkaConsumerRunnerMockTest {
       kafkaUpdates.add(kafkaUpdateBuilder.build());
       int nomForSnapshot;
       if (numberOfMessages == -1) {
-        nomForSnapshot = random.nextInt(17) + 1;
+        nomForSnapshot = random.nextInt(100) + 1;
       } else {
         nomForSnapshot = numberOfMessages;
       }

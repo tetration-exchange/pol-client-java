@@ -683,7 +683,7 @@ public class PolicyEnforcementClientMockTest {
       intent.setFlowFilter(flowFilter);
       intent.addTargetDevices(Intent.TargetDevice.MIDDLE_BOXES);
 
-      TetrationNetworkPolicyProto.InventoryFilter.Builder inventoryFilter1 = TetrationNetworkPolicyProto.InventoryFilter.newBuilder();
+      TetrationNetworkPolicyProto.InventoryGroup.Builder inventoryFilter1 = TetrationNetworkPolicyProto.InventoryGroup.newBuilder();
       inventoryFilter1.setId(consumerFilterId);
       TetrationNetworkPolicyProto.InventoryItem.Builder inventoryItem1 = TetrationNetworkPolicyProto.InventoryItem.newBuilder();
       if (consumerEndIp != null) {
@@ -701,7 +701,7 @@ public class PolicyEnforcementClientMockTest {
       }
       inventoryFilter1.addInventoryItems(inventoryItem1);
 
-      TetrationNetworkPolicyProto.InventoryFilter.Builder inventoryFilter2 = TetrationNetworkPolicyProto.InventoryFilter.newBuilder();
+      TetrationNetworkPolicyProto.InventoryGroup.Builder inventoryFilter2 = TetrationNetworkPolicyProto.InventoryGroup.newBuilder();
       inventoryFilter2.setId(providerFilterId);
       TetrationNetworkPolicyProto.InventoryItem.Builder inventoryItem2 = TetrationNetworkPolicyProto.InventoryItem.newBuilder();
       if (providerEndIp != null) {

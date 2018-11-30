@@ -116,6 +116,14 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     }
   }
 
+  static TetrationNetworkPolicyProto.TenantNetworkPolicy makeTenantNetworkPolicy(
+      TetrationNetworkPolicyProto.NetworkPolicy networkPolicy) {
+    TetrationNetworkPolicyProto.TenantNetworkPolicy.Builder builder =
+        TetrationNetworkPolicyProto.TenantNetworkPolicy.newBuilder();
+    builder.addNetworkPolicy(networkPolicy);
+    return builder.build();
+  }
+
   @Test
   public void testDeltaComputation() {
     KafkaConsumerFactory kafkaConsumerFactoryMock = mock(KafkaConsumerFactory.class);
@@ -140,7 +148,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     int intentId = 123700;
     byte[] inventoryItemIp = new byte[]{(byte) 192, (byte) 168, 1, 10};
 
-    List<TetrationNetworkPolicyProto.InventoryFilter> inventoryFilterList = new ArrayList<>();
+    List<TetrationNetworkPolicyProto.InventoryGroup> inventoryFilterList = new ArrayList<>();
     TetrationNetworkPolicyProto.PortRange.Builder portRange = TetrationNetworkPolicyProto.PortRange.newBuilder();
     portRange.setStartPort(4234);
     portRange.setEndPort(4239);
@@ -156,7 +164,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
       addressWithPrefix.setPrefixLength(IPV4_ADDR_LEN);
       TetrationNetworkPolicyProto.InventoryItem.Builder inventoryItem = TetrationNetworkPolicyProto.InventoryItem.newBuilder();
       inventoryItem.setIpAddress(addressWithPrefix);
-      TetrationNetworkPolicyProto.InventoryFilter.Builder inventoryFilter = TetrationNetworkPolicyProto.InventoryFilter.newBuilder();
+      TetrationNetworkPolicyProto.InventoryGroup.Builder inventoryFilter = TetrationNetworkPolicyProto.InventoryGroup.newBuilder();
       inventoryFilter.setId(String.valueOf(inventoryFilterId++));
       inventoryFilter.addInventoryItems(inventoryItem);
       inventoryItemIp[3]++;
@@ -183,7 +191,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     // test: add intent0 = [intent0]
     TetrationNetworkPolicyProto.NetworkPolicy.Builder previousBuilder = networkPolicy.clone();
     networkPolicy.addIntents(intentList.get(0));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.FULL_SNAPSHOT);
     List<PolicyEnforcementClient.IntentRecord> intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -192,7 +200,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     // test: add intent1 to the end: [intent0, intent1]
     previousBuilder = networkPolicy.clone();
     networkPolicy.addIntents(intentList.get(1));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -201,7 +209,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     // test: add intent2 to the begin: [intent2, intent0, intent1]
     previousBuilder = networkPolicy.clone();
     networkPolicy.addIntents(0, intentList.get(2));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -210,7 +218,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     // test: add intent3 after intent 0: [intent2, intent0, intent3, intent1]
     previousBuilder = networkPolicy.clone();
     networkPolicy.addIntents(2, intentList.get(3));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -220,7 +228,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     previousBuilder = networkPolicy.clone();
     networkPolicy.removeIntents(3);
     networkPolicy.addIntents(2, intentList.get(1));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -230,7 +238,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     previousBuilder = networkPolicy.clone();
     networkPolicy.removeIntents(0);
     networkPolicy.addIntents(2, intentList.get(2));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -239,7 +247,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     // test: delete intent0: [intent1, intent2, intent3]
     previousBuilder = networkPolicy.clone();
     networkPolicy.removeIntents(0);
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -248,7 +256,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     // test: delete intent3: [intent1, intent2]
     previousBuilder = networkPolicy.clone();
     networkPolicy.removeIntents(2);
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -259,7 +267,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     networkPolicy.addIntents(0, intentList.get(0));
     networkPolicy.addIntents(3, intentList.get(3));
     networkPolicy.addIntents(4, intentList.get(4));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 3);
@@ -275,7 +283,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     networkPolicy.addIntents(0, intentList.get(4));
     networkPolicy.addIntents(intentList.get(1));
     networkPolicy.addIntents(intentList.get(0));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 4);
@@ -287,7 +295,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     networkPolicy.removeIntents(1);
     networkPolicy.addIntents(1, intentList.get(1));
     networkPolicy.addIntents(3, intentList.get(3));
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 2);
@@ -297,7 +305,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     previousBuilder = networkPolicy.clone();
     networkPolicy.removeIntents(2);
     networkPolicy.removeIntents(2);
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 2);
@@ -307,7 +315,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     previousBuilder = networkPolicy.clone();
     networkPolicy.clearIntents();
     networkPolicy.clearInventoryFilters();
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 3);
@@ -396,7 +404,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     InetAddress inetAddress = InetAddress.getByName("fe80::aa11:9305:4b35:d755");
     byte[] inventoryItemIp = inetAddress.getAddress();
 
-    List<TetrationNetworkPolicyProto.InventoryFilter> inventoryFilterList = new ArrayList<>();
+    List<TetrationNetworkPolicyProto.InventoryGroup> inventoryFilterList = new ArrayList<>();
     TetrationNetworkPolicyProto.PortRange.Builder portRange = TetrationNetworkPolicyProto.PortRange.newBuilder();
     portRange.setStartPort(4234);
     portRange.setEndPort(4239);
@@ -412,7 +420,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
       addressWithPrefix.setPrefixLength(IPV4_ADDR_LEN);
       TetrationNetworkPolicyProto.InventoryItem.Builder inventoryItem = TetrationNetworkPolicyProto.InventoryItem.newBuilder();
       inventoryItem.setIpAddress(addressWithPrefix);
-      TetrationNetworkPolicyProto.InventoryFilter.Builder inventoryFilter = TetrationNetworkPolicyProto.InventoryFilter.newBuilder();
+      TetrationNetworkPolicyProto.InventoryGroup.Builder inventoryFilter = TetrationNetworkPolicyProto.InventoryGroup.newBuilder();
       inventoryFilter.setId(String.valueOf(inventoryFilterId++));
       inventoryFilter.addInventoryItems(inventoryItem);
       inventoryItemIp[inventoryItemIp.length - 1]++;
@@ -435,7 +443,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     // test: add intent0 = [intent0]
     TetrationNetworkPolicyProto.NetworkPolicy.Builder previousBuilder = networkPolicy.clone();
     networkPolicy.addIntents(intent);
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.FULL_SNAPSHOT);
     List<PolicyEnforcementClient.IntentRecord> intentRecordList = this.receivedEvent.getIntentRecords();
     assertEquals(intentRecordList.size(), 1);
@@ -467,7 +475,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
     TetrationNetworkPolicyProto.NetworkPolicy.Builder networkPolicy = TetrationNetworkPolicyProto.NetworkPolicy.newBuilder();
     networkPolicy.setCatchAll(catchAllBuilder);
 
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.FULL_SNAPSHOT);
     assertNotNull(this.receivedEvent.getCatchAllPolicyRecord());
     assertEquals(this.receivedEvent.getCatchAllPolicyRecord().getRecordType(), PolicyEnforcementClient.RecordType.CREATE);
@@ -476,7 +484,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
 
     catchAllBuilder.setAction(TetrationNetworkPolicyProto.CatchAllPolicy.Action.DROP);
     networkPolicy.setCatchAll(catchAllBuilder);
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     assertNotNull(this.receivedEvent.getCatchAllPolicyRecord());
     assertEquals(this.receivedEvent.getCatchAllPolicyRecord().getRecordType(), PolicyEnforcementClient.RecordType.UPDATE);
@@ -484,7 +492,7 @@ public class PolicyEnforcementClientImplTest implements PolicyEnforcementClient.
         TetrationNetworkPolicyProto.CatchAllPolicy.Action.DROP);
 
     networkPolicy.clearCatchAll();
-    client.notify(networkPolicy.build());
+    client.notify(makeTenantNetworkPolicy(networkPolicy.build()));
     assertEquals(this.receivedEvent.getEventType(), PolicyEnforcementClient.EventType.INCREMENTAL_UPDATE);
     assertNotNull(this.receivedEvent.getCatchAllPolicyRecord());
     assertEquals(this.receivedEvent.getCatchAllPolicyRecord().getRecordType(), PolicyEnforcementClient.RecordType.DELETE);

@@ -69,7 +69,7 @@ public class KafkaConsumerFactory {
     }
     // extract group id from topic name
     String[] topicNameParts = topicName.split("-");
-    if (topicNameParts.length != 2) {
+    if (topicNameParts.length < 2) {
       throw new IllegalArgumentException("Could not extract group id from topic name=" + topicName);
     }
 
@@ -78,7 +78,7 @@ public class KafkaConsumerFactory {
 
     Properties props = new Properties();
     props.put("bootstrap.servers", kafkaBrokers);
-    props.put("group.id", topicNameParts[1]);
+    props.put("group.id", topicNameParts[topicNameParts.length - 1]);
     props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
     props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
     props.put("enable.auto.commit", "false");

@@ -41,7 +41,7 @@ public class KafkaConsumerRunner {
    * Callback to notify a full snapshot of received network policies
    */
   public interface PollCallback {
-    void notify(NetworkPolicy networkPolicy);
+    void notify(TenantNetworkPolicy tenantNetworkPolicy);
   }
 
   /**
@@ -170,6 +170,7 @@ public class KafkaConsumerRunner {
         return; // ignore this broken snapshot
       }
       long idx = 0;
+      TenantNetworkPolicy.Builder tenantNetworkPolicy = TenantNetworkPolicy.newBuilder();
       NetworkPolicy.Builder networkPolicy = NetworkPolicy.newBuilder();
       for (KafkaUpdate kafkaUpdate : pendingKafkaUpdates) {
         if (idx != kafkaUpdate.getSequenceNum()) {
@@ -178,6 +179,18 @@ public class KafkaConsumerRunner {
           return; // ignore this inconsistent snapshot
         }
         TenantNetworkPolicy tnp = kafkaUpdate.getTenantNetworkPolicy();
+        if (tnp.getNetworkVrfsCount() > 0) {
+          tenantNetworkPolicy.addAllNetworkVrfs(tnp.getNetworkVrfsList());
+        }
+        if (tnp.getRootScopeId() != null && !tnp.getRootScopeId().isEmpty()) {
+          tenantNetworkPolicy.setRootScopeId(tnp.getRootScopeId());
+        }
+        if (tnp.getTenantName() != null && !tnp.getTenantName().isEmpty()) {
+          tenantNetworkPolicy.setTenantName((tnp.getTenantName()));
+        }
+        if (tnp.getScopesCount() > 0) {
+          tenantNetworkPolicy.putAllScopes(tnp.getScopesMap());
+        }
         for (NetworkPolicy np : tnp.getNetworkPolicyList()) {
           networkPolicy.addAllIntents(np.getIntentsList());
           networkPolicy.addAllInventoryFilters(np.getInventoryFiltersList());
@@ -189,7 +202,8 @@ public class KafkaConsumerRunner {
       }
       logger.debug("Calling callback from " + KafkaPartitionState.class.getName());
       try {
-        pollCallback.notify(networkPolicy.build());
+        tenantNetworkPolicy.addNetworkPolicy(networkPolicy);
+        pollCallback.notify(tenantNetworkPolicy.build());
         logger.info("Callback from " + KafkaPartitionState.class.getName() + " returned");
       } catch (Exception e) {
         logger.error("Exception occurred in callback: " + e.getMessage());
