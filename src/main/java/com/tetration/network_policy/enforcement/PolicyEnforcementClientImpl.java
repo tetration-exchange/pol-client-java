@@ -89,7 +89,7 @@ public class PolicyEnforcementClientImpl
     try {
       TetrationNetworkPolicyProto.NetworkPolicy.Builder builder =
           TetrationNetworkPolicyProto.NetworkPolicy.newBuilder();
-      for (TetrationNetworkPolicyProto.InventoryFilter inventoryFilter: this.currentInventoryMap.values()) {
+      for (TetrationNetworkPolicyProto.InventoryGroup inventoryFilter: this.currentInventoryMap.values()) {
         // no copy of inventory filter necessary as protobuf objects are immutable
         builder.addInventoryFilters(inventoryFilter);
       }
@@ -114,14 +114,17 @@ public class PolicyEnforcementClientImpl
     this.currentInventoryMap = new HashMap<>();
     this.currentIntentsLock = new ReentrantReadWriteLock();
     this.errorList = new ArrayList<>();
+    this.currentTenantPolicyMetaData = new TenantPolicyMetaData();
   }
 
   @Override
-  public void notify(TetrationNetworkPolicyProto.NetworkPolicy networkPolicy) {
+  public void notify(TetrationNetworkPolicyProto.TenantNetworkPolicy tenantNetworkPolicy) {
+    // the provided tenantNetworkPolicy has only one networkPolicy element
+    TetrationNetworkPolicyProto.NetworkPolicy networkPolicy = tenantNetworkPolicy.getNetworkPolicy(0);
     if (traceNetworkPolicy) {
       JsonFormat.Printer printer = JsonFormat.printer();
       try {
-        logger.info("[BEGIN]\n" + printer.print(networkPolicy) + "\n[END]\n");
+        logger.info("[BEGIN]\n" + printer.print(tenantNetworkPolicy) + "\n[END]\n");
       } catch (InvalidProtocolBufferException e) {
         logger.error("protobuf format error: " + e.getMessage());
       }
@@ -142,7 +145,7 @@ public class PolicyEnforcementClientImpl
         result = new Event(EventType.FULL_SNAPSHOT);
         // this is a full snapshot for first time or no matched intents found previously
         this.calculateCurrentSnapshot(networkPolicy);
-        for (TetrationNetworkPolicyProto.InventoryFilter inventoryFilter: this.currentInventoryMap.values()) {
+        for (TetrationNetworkPolicyProto.InventoryGroup inventoryFilter: this.currentInventoryMap.values()) {
           InventoryFilterRecord inventoryFilterRecord = new InventoryFilterRecord(RecordType.CREATE, inventoryFilter);
           result.inventoryFilterRecords.add(inventoryFilterRecord);
           logger.info("InventoryFilterRecord: add inventory filter id=" + inventoryFilter.getId());
@@ -170,11 +173,21 @@ public class PolicyEnforcementClientImpl
       wLock.unlock();
     }
 
+    this.currentTenantPolicyMetaData.tenantName = tenantNetworkPolicy.getTenantName();
+    this.currentTenantPolicyMetaData.rootScopeId = tenantNetworkPolicy.getRootScopeId();
+    this.currentTenantPolicyMetaData.networkVrfs = tenantNetworkPolicy.getNetworkVrfsList();
+    this.currentTenantPolicyMetaData.scopes = tenantNetworkPolicy.getScopesMap();
+
     // notify client only if there's changes
     if (!result.intentRecords.isEmpty() || !result.inventoryFilterRecords.isEmpty() ||
         result.getCatchAllPolicyRecord() != null) {
       this.eventCallback.notify(result);
     }
+  }
+
+  @Override
+  public TenantPolicyMetaData getCurrentTenantPolicyMetaData() {
+    return this.currentTenantPolicyMetaData;
   }
 
   /**
@@ -198,13 +211,13 @@ public class PolicyEnforcementClientImpl
     // step 1)
     List<TetrationNetworkPolicyProto.Intent> oldIntentList = this.currentIntentList;
     Map<String, TetrationNetworkPolicyProto.Intent> oldIntentMap = this.currentIntentMap;
-    Map<String, TetrationNetworkPolicyProto.InventoryFilter> oldInventoryMap = this.currentInventoryMap;
+    Map<String, TetrationNetworkPolicyProto.InventoryGroup> oldInventoryMap = this.currentInventoryMap;
     TetrationNetworkPolicyProto.CatchAllPolicy oldCatchAllPolicy = this.currentCatchAllPolicy;
     // step 2)
     this.calculateCurrentSnapshot(networkPolicy);
     // step 3)
-    for (TetrationNetworkPolicyProto.InventoryFilter inventoryFilter: this.currentInventoryMap.values()) {
-      TetrationNetworkPolicyProto.InventoryFilter oldInventoryFilter = oldInventoryMap.get(inventoryFilter.getId());
+    for (TetrationNetworkPolicyProto.InventoryGroup inventoryFilter: this.currentInventoryMap.values()) {
+      TetrationNetworkPolicyProto.InventoryGroup oldInventoryFilter = oldInventoryMap.get(inventoryFilter.getId());
       if (oldInventoryFilter != null) {
         if (!ProtoHelper.isEqual(oldInventoryFilter, inventoryFilter)) {
           InventoryFilterRecord inventoryFilterRecord = new InventoryFilterRecord(RecordType.UPDATE, inventoryFilter);
@@ -218,7 +231,7 @@ public class PolicyEnforcementClientImpl
         logger.info("InventoryFilterRecord: add inventory filter id=" + inventoryFilter.getId());
       }
     }
-    for (TetrationNetworkPolicyProto.InventoryFilter oldInventoryFilter: oldInventoryMap.values()) {
+    for (TetrationNetworkPolicyProto.InventoryGroup oldInventoryFilter: oldInventoryMap.values()) {
       InventoryFilterRecord inventoryFilterRecord = new InventoryFilterRecord(RecordType.DELETE, oldInventoryFilter);
       result.inventoryFilterRecords.add(inventoryFilterRecord);
       logger.info("InventoryFilterRecord: delete inventory filter id=" + oldInventoryFilter.getId());
@@ -382,15 +395,15 @@ public class PolicyEnforcementClientImpl
    */
   private void calculateCurrentSnapshot(
       TetrationNetworkPolicyProto.NetworkPolicy networkPolicy) {
-    Map<String, TetrationNetworkPolicyProto.InventoryFilter> inventoryFilterCache = new HashMap<>();
+    Map<String, TetrationNetworkPolicyProto.InventoryGroup> inventoryFilterCache = new HashMap<>();
 
     /* helper class to keep track inventory items of inventory filter matched
      * with appliance address
      */
     class FilterAndMatchedItems {
-      TetrationNetworkPolicyProto.InventoryFilter filter;
+      TetrationNetworkPolicyProto.InventoryGroup filter;
       List<TetrationNetworkPolicyProto.InventoryItem> matchedItems = new ArrayList<>();
-      FilterAndMatchedItems(TetrationNetworkPolicyProto.InventoryFilter filter) {
+      FilterAndMatchedItems(TetrationNetworkPolicyProto.InventoryGroup filter) {
         this.filter = filter;
       }
     }
@@ -398,7 +411,7 @@ public class PolicyEnforcementClientImpl
      * to build a cache of remaining inventory filters needed by 2nd for loop
      */
     Map<String, FilterAndMatchedItems> matchedInventoryFilterMap = new HashMap<>();
-    for (TetrationNetworkPolicyProto.InventoryFilter inventoryFilter :
+    for (TetrationNetworkPolicyProto.InventoryGroup inventoryFilter :
         networkPolicy.getInventoryFiltersList()) {
       for (TetrationNetworkPolicyProto.InventoryItem inventoryItem :
           inventoryFilter.getInventoryItemsList()) {
@@ -438,7 +451,7 @@ public class PolicyEnforcementClientImpl
       }
       FilterAndMatchedItems consumerFilterAndMatchedItems =
           matchedInventoryFilterMap.get(flowFilter.getConsumerFilterId());
-      TetrationNetworkPolicyProto.InventoryFilter consumerFilter;
+      TetrationNetworkPolicyProto.InventoryGroup consumerFilter;
       boolean consumerMatched;
       if (consumerFilterAndMatchedItems != null) {
         consumerMatched = true;
@@ -458,7 +471,7 @@ public class PolicyEnforcementClientImpl
       }
       FilterAndMatchedItems providerFilterAndMatchedItems =
           matchedInventoryFilterMap.get(flowFilter.getProviderFilterId());
-      TetrationNetworkPolicyProto.InventoryFilter providerFilter;
+      TetrationNetworkPolicyProto.InventoryGroup providerFilter;
       /* if consumer (exclusive) or provider has matched with appliance address,
        * build new filter with matched items only
        * otherwise, ie if both consumer and provider match with appliance address,
@@ -467,7 +480,7 @@ public class PolicyEnforcementClientImpl
       if (providerFilterAndMatchedItems != null) {
         providerFilter = providerFilterAndMatchedItems.filter;
         if (!consumerMatched) {
-          TetrationNetworkPolicyProto.InventoryFilter.Builder filterBuilder =
+          TetrationNetworkPolicyProto.InventoryGroup.Builder filterBuilder =
               providerFilter.toBuilder().clone();
           filterBuilder.clearInventoryItems();
           filterBuilder.addAllInventoryItems(providerFilterAndMatchedItems.matchedItems);
@@ -476,7 +489,7 @@ public class PolicyEnforcementClientImpl
       } else {
         providerFilter = inventoryFilterCache.get(flowFilter.getProviderFilterId());
         if (consumerMatched) {
-          TetrationNetworkPolicyProto.InventoryFilter.Builder filterBuilder =
+          TetrationNetworkPolicyProto.InventoryGroup.Builder filterBuilder =
               consumerFilter.toBuilder().clone();
           filterBuilder.clearInventoryItems();
           filterBuilder.addAllInventoryItems(consumerFilterAndMatchedItems.matchedItems);
@@ -539,7 +552,7 @@ public class PolicyEnforcementClientImpl
   private KafkaConsumerRunner kafkaConsumerRunner;
   private List<TetrationNetworkPolicyProto.Intent> currentIntentList;
   private Map<String, TetrationNetworkPolicyProto.Intent> currentIntentMap;
-  private Map<String, TetrationNetworkPolicyProto.InventoryFilter> currentInventoryMap;
+  private Map<String, TetrationNetworkPolicyProto.InventoryGroup> currentInventoryMap;
   private TetrationNetworkPolicyProto.CatchAllPolicy currentCatchAllPolicy;
   private ReadWriteLock currentIntentsLock;
   private List<TetrationNetworkPolicyProto.InventoryItem> applianceInventoryItemList;
@@ -549,4 +562,5 @@ public class PolicyEnforcementClientImpl
    * client can call getErrorList() to check if there's any errors detected
    */
   private List<String> errorList;
+  private TenantPolicyMetaData currentTenantPolicyMetaData;
 }

@@ -9,6 +9,7 @@ import com.tetration.tetration_network_policy.proto.TetrationNetworkPolicyProto;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -75,17 +76,17 @@ public interface PolicyEnforcementClient {
      *
      * @return Tetration inventory filter object associated with this record
      */
-    public TetrationNetworkPolicyProto.InventoryFilter getInventoryFilter() {
+    public TetrationNetworkPolicyProto.InventoryGroup getInventoryFilter() {
       return this.inventoryFilter;
     }
 
-    public InventoryFilterRecord(RecordType recordType, TetrationNetworkPolicyProto.InventoryFilter inventoryFilter) {
+    public InventoryFilterRecord(RecordType recordType, TetrationNetworkPolicyProto.InventoryGroup inventoryFilter) {
       this.recordType = recordType;
       this.inventoryFilter = inventoryFilter;
     }
 
     protected RecordType recordType;
-    protected TetrationNetworkPolicyProto.InventoryFilter inventoryFilter;
+    protected TetrationNetworkPolicyProto.InventoryGroup inventoryFilter;
 
   }
 
@@ -285,6 +286,29 @@ public interface PolicyEnforcementClient {
     long timeInMillis;
   }
 
+  public static class TenantPolicyMetaData {
+    public String getTenantName() {
+      return tenantName;
+    }
+
+    public String getRootScopeId() {
+      return rootScopeId;
+    }
+
+    public List<String> getNetworkVrfs() {
+      return networkVrfs;
+    }
+
+    public Map<String, TetrationNetworkPolicyProto.ScopeInfo> getScopes() {
+      return scopes;
+    }
+
+    String tenantName;
+    String rootScopeId;
+    List<String> networkVrfs;
+    Map<String, TetrationNetworkPolicyProto.ScopeInfo> scopes;
+  }
+
   /**
    * Callback interface to be implemented by consumer (usually appliance vendor)
    */
@@ -339,4 +363,8 @@ public interface PolicyEnforcementClient {
    */
   public TetrationNetworkPolicyProto.NetworkPolicy getCurrentNetworkPolicy();
 
+  /**
+   * Return current tenant policy meta data received from previous update
+   */
+  public TenantPolicyMetaData getCurrentTenantPolicyMetaData();
 }

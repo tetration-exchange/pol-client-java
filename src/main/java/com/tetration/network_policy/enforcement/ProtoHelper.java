@@ -239,7 +239,7 @@ public class ProtoHelper {
     return false;
   }
 
-  public static boolean isEqual(TetrationNetworkPolicyProto.InventoryFilter lhs, TetrationNetworkPolicyProto.InventoryFilter rhs) {
+  public static boolean isEqual(TetrationNetworkPolicyProto.InventoryGroup lhs, TetrationNetworkPolicyProto.InventoryGroup rhs) {
     if (lhs == null && rhs == null) {
       return true;
     }
